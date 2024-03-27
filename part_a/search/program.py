@@ -21,7 +21,7 @@ def a_star_search(board, start, goal):
             path = find_path_to_fill_row(came_from,start,goal.r)
             return path
         elif isGoal and rowOrCol == "COL":
-            #TODO make the fill col function
+            path = fill_column_path(came_from, start, goal.c)
             return path
         
         for neighbor in get_neighbors(current, board):
@@ -46,6 +46,16 @@ def find_path_to_fill_row(came_from, start, goal_row):
                 path.append(j)
             j = came_from[j]
         # Move to the previous coordinate using the came_from dictionary
+    return path
+
+def fill_column_path (came_from, start, goal_column):
+    path = []
+    column = [i for i in list(came_from.key()) if i.r == goal_column]
+    for i in column:
+        while i != start:
+            if i not in path:
+                path.append(i)
+            i = came_from[i]
     return path
 
 def heuristic(board, current, goal):
