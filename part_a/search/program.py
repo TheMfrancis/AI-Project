@@ -10,6 +10,7 @@ def a_star_search(board, start, goal):
     open_set.put((0, start))  # (f-score, node)
     came_from = {start: None}  # Store the entire path from start to current node
     g_score = {start: 0}
+    nodeStage = {start: 1}
 
     while not open_set.empty():
         _, current = open_set.get()
@@ -21,17 +22,19 @@ def a_star_search(board, start, goal):
             path = find_path_to_fill_row(came_from,start,goal.r)
             return path
         elif isGoal and rowOrCol == "COL":
+            print(nodeStage)
             path = fill_column_path(came_from, start, goal.c)
             return path
         
-        for neighbor in get_neighbors(current, board):
+        for neighbor in get_neighbors(current, board, nodeStage[current]):
             tentative_g_score = g_score[current] + 1
             if tentative_g_score < g_score.get(neighbor, float('inf')):
                 came_from[neighbor] = current  # Update the path
                 g_score[neighbor] = tentative_g_score
+                nodeStage[neighbor] = 1 if nodeStage[current] == 4 else nodeStage[current] + 1
                 f_score = tentative_g_score + heuristic(board, neighbor, goal)
                 open_set.put((f_score, neighbor))
-
+    print(nodeStage)
     return None  # No path found
 
 def find_path_to_fill_row(came_from, start, goal_row):
@@ -72,7 +75,7 @@ def heuristic(board, current, goal):
     else:
         return manhattan_dist + col_spaces
 
-def get_neighbors(coord, board):
+def get_neighbors(coord, board, stage):
     """
     Get the neighboring coordinates of a given coordinate,
     considering obstacles on the board.
@@ -157,7 +160,9 @@ def search(
         print("Shortest path from start to goal:", shortest_path)
     else:
         print("No path exists from start to goal.")
-
+    for i in shortest_path:
+        board[i] = PlayerColor.RED
+    print(render_board(board, target, ansi=True))
     # Here we're returning "hardcoded" actions as an example of the expected
     # output format. Of course, you should instead return the result of your
     # search algorithm. Remember: if no solution is possible for a given input,
