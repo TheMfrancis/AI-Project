@@ -5,8 +5,35 @@ from .core import PlayerColor, Coord, PlaceAction, Shape
 from .utils import render_board
 from queue import PriorityQueue
 
+def a_star_search(board, start, goal):
+    open_set = PriorityQueue()
+    open_set.put((0, start))  # (f-score, node)
+    came_from = {start: None}  # Store the entire path from start to current node
+    g_score = {start: 0}
 
-def create_dict(board):return True
+    while not open_set.empty():
+        _, current = open_set.get()
+
+        # Check if filling the row or column of the goal
+        rowOrCol,isGoal = contains_goal_row_or_column(came_from,goal,board)
+        if isGoal and rowOrCol == "ROW":
+            #print(came_from)
+            path = find_path_to_fill_row(came_from,start,goal.r)
+            return path
+        elif isGoal and rowOrCol == "COL":
+            #TODO make the fill col function
+            return path
+        
+        for neighbor in get_neighbors(current, board):
+            tentative_g_score = g_score[current] + 1
+            if tentative_g_score < g_score.get(neighbor, float('inf')):
+                came_from[neighbor] = current  # Update the path
+                g_score[neighbor] = tentative_g_score
+                f_score = tentative_g_score + heuristic(board, neighbor, goal)
+                open_set.put((f_score, neighbor))
+
+    return None  # No path found
+
 def find_path_to_fill_row(came_from, start, goal_row):
     # # Initialize an empty list to store the path
     path = []
@@ -20,34 +47,6 @@ def find_path_to_fill_row(came_from, start, goal_row):
             j = came_from[j]
         # Move to the previous coordinate using the came_from dictionary
     return path
-
-def a_star_search(board, start, goal):
-    open_set = PriorityQueue()
-    open_set.put((0, start))  # (f-score, node)
-    came_from = {start: None}  # Store the entire path from start to current node
-    g_score = {start: 0}
-
-    while not open_set.empty():
-        _, current = open_set.get()
-
-        # Check if filling the row or column of the goal
-        rowOrCol,isGoal = contains_goal_row_or_column(came_from,goal,board)
-        if isGoal:
-            #print(came_from)
-            pathh = find_path_to_fill_row(came_from,start,goal.r)
-            path = reconstruct_path(came_from, current)
-            return pathh
-
-        for neighbor in get_neighbors(current, board):
-            tentative_g_score = g_score[current] + 1
-            if tentative_g_score < g_score.get(neighbor, float('inf')):
-                came_from[neighbor] = current  # Update the path
-                g_score[neighbor] = tentative_g_score
-                f_score = tentative_g_score + heuristic(board, neighbor, goal)
-                open_set.put((f_score, neighbor))
-
-    return None  # No path found
-
 
 def heuristic(board, current, goal):
     # Calculate Manhattan distance to the goal
@@ -86,9 +85,9 @@ def contains_goal_row_or_column(came_from, goal, board):
     goal_coordinates_column = {Coord(r, goal.c) for r in range(11) if board.get(Coord(r, goal.c)) != PlayerColor.BLUE and board.get(Coord(r, goal.c)) != PlayerColor.RED}
     # # Check if all goal coordinates are present in the path
     if all(coord in came_from.keys() for coord in goal_coordinates_row):
-        return (0,True)
+        return ("ROW",True)
     elif all(coord in came_from.keys() for coord in goal_coordinates_column):
-        return (1,True)
+        return ("COL",True)
     else:
         return (2,False)
     
