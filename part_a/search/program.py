@@ -1,33 +1,53 @@
 # COMP30024 Artificial Intelligence, Semester 1 2024
 # Project Part A: Single Player Tetress
 
-from .core import PlayerColor, Coord, PlaceAction
+from .core import PlayerColor, Coord, PlaceAction, Shape
 from .utils import render_board
 from queue import PriorityQueue
 
 
+def create_dict(board):return True
+def find_path_to_fill_row(came_from, start, goal_row):
+    # # Initialize an empty list to store the path
+    path = []
+    row = [i for i in list(came_from.keys()) if i.r == goal_row]
+    print(row)
+    for j in row:
+        while j != start:
+        # Append the current coordinate to the path
+            if j not in path:
+                path.append(j)
+            j = came_from[j]
+        # Move to the previous coordinate using the came_from dictionary
+    return path
+
 def a_star_search(board, start, goal):
     open_set = PriorityQueue()
     open_set.put((0, start))  # (f-score, node)
-    came_from = {}
+    came_from = {start: None}  # Store the entire path from start to current node
     g_score = {start: 0}
 
     while not open_set.empty():
         _, current = open_set.get()
 
-        if current == goal:
+        # Check if filling the row or column of the goal
+        rowOrCol,isGoal = contains_goal_row_or_column(came_from,goal,board)
+        if isGoal:
+            #print(came_from)
+            pathh = find_path_to_fill_row(came_from,start,goal.r)
             path = reconstruct_path(came_from, current)
-            return path
+            return pathh
 
-        for neighbor in get_neighbors(current,board, goal):
+        for neighbor in get_neighbors(current, board):
             tentative_g_score = g_score[current] + 1
             if tentative_g_score < g_score.get(neighbor, float('inf')):
-                came_from[neighbor] = current
+                came_from[neighbor] = current  # Update the path
                 g_score[neighbor] = tentative_g_score
                 f_score = tentative_g_score + heuristic(board, neighbor, goal)
                 open_set.put((f_score, neighbor))
 
     return None  # No path found
+
 
 def heuristic(board, current, goal):
     # Calculate Manhattan distance to the goal
@@ -43,7 +63,7 @@ def heuristic(board, current, goal):
     else:
         return manhattan_dist + col_spaces
 
-def get_neighbors(coord, board, target):
+def get_neighbors(coord, board):
     """
     Get the neighboring coordinates of a given coordinate,
     considering obstacles on the board.
@@ -56,21 +76,26 @@ def get_neighbors(coord, board, target):
             # Check if the new coordinate is not obstructed by a blue block
             if board.get(Coord(new_r, new_c)) != PlayerColor.BLUE and board.get(Coord(new_r, new_c)) != PlayerColor.RED:
                 neighbors.append(Coord(new_r, new_c))  # Add the neighboring coordinate
-            if new_r == target.r and new_c == target.c:
-                neighbors.append(Coord(new_r, new_c))
     return neighbors
 
-# Helper function to reconstruct path
-def reconstruct_path(came_from, current):
-    path = [current]
-    while current in came_from:
-        current = came_from[current]
-        path.append(current)
-    return path
+def contains_goal_row_or_column(came_from, goal, board):
+    """
+    Check if the given path contains all the coordinates of the goal's row or column.
+    """
+    goal_coordinates_row = {Coord(goal.r, c) for c in range(11) if board.get(Coord(goal.r, c)) != PlayerColor.BLUE and board.get(Coord(goal.r, c)) != PlayerColor.RED}
+    goal_coordinates_column = {Coord(r, goal.c) for r in range(11) if board.get(Coord(r, goal.c)) != PlayerColor.BLUE and board.get(Coord(r, goal.c)) != PlayerColor.RED}
+    # # Check if all goal coordinates are present in the path
+    if all(coord in came_from.keys() for coord in goal_coordinates_row):
+        return (0,True)
+    elif all(coord in came_from.keys() for coord in goal_coordinates_column):
+        return (1,True)
+    else:
+        return (2,False)
     
 def findRedCoordinates(board: dict[Coord, PlayerColor]) -> list:
     red_blocks = [coord for coord, color in board.items() if color == PlayerColor.RED]
     return red_blocks
+
 
 def search(
     board: dict[Coord, PlayerColor], 
@@ -101,7 +126,7 @@ def search(
     # ...
     # ... (your solution goes here!)
     # ...
-    path = a_star_search(board, Coord(2,4), target)
+    path = a_star_search(board,Coord(2,4), target)
     if path:
         print("Shortest path from start to goal:", path)
     else:
