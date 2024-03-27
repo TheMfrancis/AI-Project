@@ -50,7 +50,7 @@ def find_path_to_fill_row(came_from, start, goal_row):
 
 def fill_column_path (came_from, start, goal_column):
     path = []
-    column = [i for i in list(came_from.key()) if i.r == goal_column]
+    column = [i for i in list(came_from.keys()) if i.c == goal_column]
     for i in column:
         while i != start:
             if i not in path:
@@ -80,11 +80,19 @@ def get_neighbors(coord, board):
     neighbors = []
     for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
         new_r, new_c = coord.r + dr, coord.c + dc
-        # Check if the new coordinate is within the bounds of the game board
-        if 0 <= new_r < 11 and 0 <= new_c < 11:
-            # Check if the new coordinate is not obstructed by a blue block
-            if board.get(Coord(new_r, new_c)) != PlayerColor.BLUE and board.get(Coord(new_r, new_c)) != PlayerColor.RED:
-                neighbors.append(Coord(new_r, new_c))  # Add the neighboring coordinate
+        # Offsets the corrdinates out of bounds to simulate the edge warping effect
+        if new_r == -1:
+            new_r = 10
+        elif new_r == 11:
+            new_r = 0
+        if new_c == -1:
+            new_c = 10
+        elif new_c == 11:
+            new_c = 0
+
+        # Check if the new coordinate is not obstructed by a blue block
+        if board.get(Coord(new_r, new_c)) != PlayerColor.BLUE and board.get(Coord(new_r, new_c)) != PlayerColor.RED:
+            neighbors.append(Coord(new_r, new_c))  # Add the neighboring coordinate
     return neighbors
 
 def contains_goal_row_or_column(came_from, goal, board):
