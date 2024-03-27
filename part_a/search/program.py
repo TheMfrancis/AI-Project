@@ -142,10 +142,19 @@ def search(
     # Do some impressive AI stuff here to find the solution...
     # ...
     # ... (your solution goes here!)
-    # ...
-    path = a_star_search(board,Coord(2,4), target)
-    if path:
-        print("Shortest path from start to goal:", path)
+    red_coords = findRedCoordinates(board)
+    shortest_path = None
+    for i in red_coords:
+        path = a_star_search(board, i, target)
+        if path == None:
+            continue
+        if shortest_path == None:
+            shortest_path = path
+        elif len(path) < len(shortest_path):
+            shortest_path = path
+
+    if shortest_path:
+        print("Shortest path from start to goal:", shortest_path)
     else:
         print("No path exists from start to goal.")
 
