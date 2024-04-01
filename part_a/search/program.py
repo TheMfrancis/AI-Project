@@ -1,98 +1,104 @@
 # COMP30024 Artificial Intelligence, Semester 1 2024
 # Project Part A: Single Player Tetress
 
-from .core import PlayerColor, Coord, PlaceAction, Shape
+from .core import PlayerColor, Coord, PlaceAction, Shape, BoardState
 from .utils import render_board
 from queue import PriorityQueue
 
-def a_star_search(board, start, goal):
+def isGoal(board,goal):
+    goal_coordinates_row = sum([1 for c in range(11) if board.get(Coord(goal.r, c)) != None])
+    goal_coordinates_column = sum([1 for r in range(11) if board.get(Coord(r, goal.c)) != None])
+    return goal_coordinates_column == 11 or goal_coordinates_row == 11
+     
+
+def a_star_search(board,goal):
+    initialRedCoord = findRedCoordinates(board)
+    initialBoard = BoardState(board,initialRedCoord)
     open_set = PriorityQueue()
-    open_set.put((0, start))  # (f-score, node)
-    came_from = {start: None}  # Store the entire path from start to current node
-    g_score = {start: 0}
-    nodeStage = {start: 1}
-
-    while not open_set.empty():
+    visited = set()
+    open_set.put((0, initialBoard))  # (f-score, node):
+    shapes = [shape.value for shape in Shape]
+    i = 1
+    while open_set:
         _, current = open_set.get()
-
-        # Check if filling the row or column of the goal
-        rowOrCol,isGoal = contains_goal_row_or_column(came_from,goal,board)
-        if isGoal and rowOrCol == "ROW":
-            #print(came_from)
-            path = find_path_to_fill_row(came_from,start,goal.r)
-            return path
-        elif isGoal and rowOrCol == "COL":
-            print(nodeStage)
-            path = fill_column_path(came_from, start, goal.c)
-            return path
-        
-        for neighbor in get_neighbors(current, board, nodeStage[current]):
-            tentative_g_score = g_score[current] + 1
-            if tentative_g_score < g_score.get(neighbor, float('inf')):
-                came_from[neighbor] = current  # Update the path
-                g_score[neighbor] = tentative_g_score
-                nodeStage[neighbor] = 1 if nodeStage[current] == 4 else nodeStage[current] + 1
-                f_score = tentative_g_score + heuristic(board, neighbor, goal)
-                open_set.put((f_score, neighbor))
-    print(nodeStage)
+        board = current.board
+        if isGoal(board,goal):
+            return board
+        for red in current.red_coordinates:
+            neighbours = get_neighbors(red,board)
+            for neighbor in neighbours:
+                for shape in shapes:
+                    possible_start_points = get_new_starting_points(shape,neighbor)
+                    for start in possible_start_points:
+                        if can_place(start,board,shape):
+                            newBoard = board.copy()
+                            place_blocks(shape,start,newBoard)
+                            cost = len(current.red_coordinates) + 4
+                            heuristic_value = heuristic(newBoard,goal) # Calculate the heuristic value
+                            f_score = cost + heuristic_value
+                            newRedCoord = findRedCoordinates(newBoard)
+                            newBoardState = BoardState(newBoard,newRedCoord)
+                            if newBoardState not in visited:
+                                open_set.put((f_score, newBoardState))
+                                visited.add(newBoardState)
+                            #print(render_board(newBoard, goal, ansi=True))
     return None  # No path found
 
-def find_path_to_fill_row(came_from, start, goal_row):
-    # # Initialize an empty list to store the path
-    path = []
-    row = [i for i in list(came_from.keys()) if i.r == goal_row]
-    print(row)
-    for j in row:
-        while j != start:
-        # Append the current coordinate to the path
-            if j not in path:
-                path.append(j)
-            j = came_from[j]
-        # Move to the previous coordinate using the came_from dictionary
-    return path
+def place_blocks(shape,coord,board):
+    for r, c in shape:
+        new_r = (coord.r + r)%11
+        new_c = (coord.c + c)%11
+        board[Coord(new_r, new_c)] = PlayerColor.RED
 
-def fill_column_path (came_from, start, goal_column):
-    path = []
-    column = [i for i in list(came_from.keys()) if i.c == goal_column]
-    for i in column:
-        while i != start:
-            if i not in path:
-                path.append(i)
-            i = came_from[i]
-    return path
 
-def heuristic(board, current, goal):
-    # Calculate Manhattan distance to the goal
-    manhattan_dist = abs(current.r - goal.r) + abs(current.c - goal.c)
+def heuristic(board, goal):
+    goal_row = goal.r
+    goal_column = goal.c
+    row_spaces = sum([1 for r in range(11) if board.get(Coord(r, goal.c)) == None])
+    col_spaces = sum([1 for c in range(11) if board.get(Coord(goal.r, c)) == None])
+    return min(row_spaces, col_spaces)
 
-    # Determine if it's easier to fill the row or column of the goal block
-    row_spaces = sum(1 for coord, color in board.items() if coord.r == goal.r and color == None)
-    col_spaces = sum(1 for coord, color in board.items() if coord.c == goal.c and color == None)
+    
+    
+def can_place(coord, board, shape):
+    for r, c in shape:
+        new_r = (coord.r + r)%11
+        new_c = (coord.c + c)%11
+        # if new_r < 0:
+        #     new_r = 11 + new_r
+        # elif new_r > 10:
+        #     new_r = 11 - new_r
+        # if new_c < 0:
+        #     new_c = 11 + new_c
+        # elif new_c > 10:
+        #     new_c = 11 - new_c
+        if Coord(new_r,new_c) in board.keys():
+            return False
+    return True
 
-    # Adjust heuristic based on the easier option
-    if row_spaces <= col_spaces:
-        return manhattan_dist + row_spaces
-    else:
-        return manhattan_dist + col_spaces
+def get_new_starting_points(shape,neighbor):
+    res = [shape[0]]
+    ans = []
+    for i in range(1,4):
+        diff = tuple(x - y for x, y in zip(shape[i], shape[0]))
+        newStart = tuple(x - y for x, y in zip(shape[0], diff))
+        res.append(newStart)
+    for i in res:
+        new_r = (neighbor.r + i[0])%11
+        new_c = (neighbor.c + i[1])%11
+        ans.append(Coord(new_r,new_c))
+    return ans
 
-def get_neighbors(coord, board, stage):
+
+def get_neighbors(coord, board):
     """
     Get the neighboring coordinates of a given coordinate,
     considering obstacles on the board.
     """
     neighbors = []
     for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
-        new_r, new_c = coord.r + dr, coord.c + dc
-        # Offsets the corrdinates out of bounds to simulate the edge warping effect
-        if new_r == -1:
-            new_r = 10
-        elif new_r == 11:
-            new_r = 0
-        if new_c == -1:
-            new_c = 10
-        elif new_c == 11:
-            new_c = 0
-
+        new_r = (coord.r + dr)%11
+        new_c = (coord.c + dc)%11
         # Check if the new coordinate is not obstructed by a blue block
         if board.get(Coord(new_r, new_c)) != PlayerColor.BLUE and board.get(Coord(new_r, new_c)) != PlayerColor.RED:
             neighbors.append(Coord(new_r, new_c))  # Add the neighboring coordinate
@@ -145,24 +151,23 @@ def search(
     # Do some impressive AI stuff here to find the solution...
     # ...
     # ... (your solution goes here!)
-    red_coords = findRedCoordinates(board)
-    shortest_path = None
-    for i in red_coords:
-        path = a_star_search(board, i, target)
-        if path == None:
-            continue
-        if shortest_path == None:
-            shortest_path = path
-        elif len(path) < len(shortest_path):
-            shortest_path = path
-
-    if shortest_path:
-        print("Shortest path from start to goal:", shortest_path)
-    else:
-        print("No path exists from start to goal.")
-    for i in shortest_path:
-        board[i] = PlayerColor.RED
-    print(render_board(board, target, ansi=True))
+    # for i in red_coords:
+    #     path = a_star_search(board, i, target)
+    #     if path == None:
+    #         continue
+    #     if shortest_path == None:
+    #         shortest_path = path
+    #     elif len(path) < len(shortest_path):
+    #         shortest_path = path
+    shortest_path = a_star_search(board,target)
+    print(render_board(shortest_path, target, ansi=True))
+    # if shortest_path:
+    #     print("Shortest path from start to goal:", shortest_path)
+    # else:
+    #     print("No path exists from start to goal.")
+    # for i in shortest_path:
+    #     board[i] = PlayerColor.RED
+    # print(render_board(board, target, ansi=True))
     # Here we're returning "hardcoded" actions as an example of the expected
     # output format. Of course, you should instead return the result of your
     # search algorithm. Remember: if no solution is possible for a given input,
