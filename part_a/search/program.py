@@ -12,7 +12,7 @@ def isGoal(board,goal):
      
 
 def a_star_search(board,goal):
-    initialRedCoord = findRedCoordinates(board)
+    initialRedCoord = find_red_coordinates(board)
     initialBoard = BoardState(board,initialRedCoord)
     open_set = PriorityQueue()
     visited = set()
@@ -41,7 +41,6 @@ def a_star_search(board,goal):
                             if newBoardState not in visited:
                                 open_set.put((f_score, newBoardState))
                                 visited.add(newBoardState)
-                            #print(render_board(newBoard, goal, ansi=True))
     return None  # No path found
 
 def place_blocks(shape,coord,board):
@@ -64,14 +63,6 @@ def can_place(coord, board, shape):
     for r, c in shape:
         new_r = (coord.r + r)%11
         new_c = (coord.c + c)%11
-        # if new_r < 0:
-        #     new_r = 11 + new_r
-        # elif new_r > 10:
-        #     new_r = 11 - new_r
-        # if new_c < 0:
-        #     new_c = 11 + new_c
-        # elif new_c > 10:
-        #     new_c = 11 - new_c
         if Coord(new_r,new_c) in board.keys():
             return False
     return True
@@ -118,10 +109,25 @@ def contains_goal_row_or_column(came_from, goal, board):
     else:
         return (2,False)
     
-def findRedCoordinates(board: dict[Coord, PlayerColor]) -> list:
+def find_red_coordinates(board: dict[Coord, PlayerColor]) -> list:
     red_blocks = [coord for coord, color in board.items() if color == PlayerColor.RED]
     return red_blocks
 
+def find_best_red(red_coords, goal):
+    best_row_coord = red_coords[0]
+    best_col_coord = red_coords[0]
+    r_dis = abs(best_row_coord.r - goal.r)
+    c_dis = abs(best_col_coord.c - goal.c) 
+    for red_coord in range (1, len(red_coords)):
+        new_r_dis = abs(red_coord.r - goal.r)
+        new_c_dis = abs(red_coord.c - goal.c)
+        if new_r_dis < r_dis:
+            best_row_coord = red_coord
+            r_dis = new_r_dis
+        if new_c_dis < c_dis:
+            best_col_coord = red_coord
+            c_dis = new_c_dis
+    return (best_row_coord, best_col_coord)
 
 def search(
     board: dict[Coord, PlayerColor], 
