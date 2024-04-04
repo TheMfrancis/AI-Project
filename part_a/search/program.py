@@ -1,7 +1,8 @@
 # COMP30024 Artificial Intelligence, Semester 1 2024
 # Project Part A: Single Player Tetress
 
-from .core import PlayerColor, Coord, PlaceAction, Shape, BoardState
+from .core import PlayerColor, Coord, PlaceAction
+from .helper import Shape, BoardState
 from .utils import render_board
 from queue import PriorityQueue
 
@@ -9,21 +10,67 @@ def isGoal(board,goal):
     goal_coordinates_row = sum([1 for c in range(11) if board.get(Coord(goal.r, c)) != None])
     goal_coordinates_column = sum([1 for r in range(11) if board.get(Coord(r, goal.c)) != None])
     return goal_coordinates_column == 11 or goal_coordinates_row == 11
+def retracePath(boardState,start):
+    res = []
+    while boardState.board != start:
+        res.append(boardState.redInserted)
+        boardState = boardState.parent
+    res.reverse()
+    return res
+
+from collections import defaultdict
+
+def update_board(board,goal):
+    """
+    Update the board dictionary by removing keys corresponding to full rows or columns.
+
+    Args:
+        board (dict): Dictionary representing the game board.
+
+    Returns:
+        None: The function modifies the input board dictionary directly.
+    """
+    # Count the number of blocks in each row and column
+    row_counts = defaultdict(int)
+    col_counts = defaultdict(int)
+    for coord, color in board.items():
+        if color is not None:
+            row_counts[coord.r] += 1
+            col_counts[coord.c] += 1
+    
+    row_counts[goal.r] = None
+    col_counts[goal.c] = None
+    
+    # Identify full rows and columns
+    full_rows = [r for r, count in row_counts.items() if count == 11]
+    full_cols = [c for c, count in col_counts.items() if count == 11]
+    
+    # Remove keys corresponding to full rows
+    for row in full_rows:
+        for col in range(11):
+            del board[Coord(row, col)]
+    
+    # Remove keys corresponding to full columns
+    for col in full_cols:
+        for row in range(11):
+            del board[Coord(row, col)]
+
      
 
 def a_star_search(board,goal):
-    initialRedCoord = find_red_coordinates(board)
+    initialRedCoord = findRedCoordinates(board)
     initialBoard = BoardState(board,initialRedCoord)
     open_set = PriorityQueue()
     visited = set()
     open_set.put((0, initialBoard))  # (f-score, node):
     shapes = [shape.value for shape in Shape]
-    i = 1
-    while open_set:
+    i = 5
+    while open_set.empty() == False:
+        i -= 1
         _, current = open_set.get()
         board = current.board
         if isGoal(board,goal):
-            return board
+            return current
         for red in current.red_coordinates:
             neighbours = get_neighbors(red,board)
             for neighbor in neighbours:
@@ -32,22 +79,27 @@ def a_star_search(board,goal):
                     for start in possible_start_points:
                         if can_place(start,board,shape):
                             newBoard = board.copy()
-                            place_blocks(shape,start,newBoard)
-                            cost = len(current.red_coordinates) + 4
+                            blocks = place_blocks(shape,start,newBoard)
+                            update_board(newBoard,goal)
+                            cost = current.cost + 4
                             heuristic_value = heuristic(newBoard,goal) # Calculate the heuristic value
                             f_score = cost + heuristic_value
-                            newRedCoord = find_red_coordinates(newBoard)
-                            newBoardState = BoardState(newBoard,newRedCoord)
+                            newRedCoord = findRedCoordinates(newBoard)
+                            newBoardState = BoardState(newBoard,newRedCoord,current,blocks,cost)
                             if newBoardState not in visited:
                                 open_set.put((f_score, newBoardState))
                                 visited.add(newBoardState)
+                            #print(render_board(newBoard, goal, ansi=True))
     return None  # No path found
 
 def place_blocks(shape,coord,board):
+    res = []
     for r, c in shape:
         new_r = (coord.r + r)%11
         new_c = (coord.c + c)%11
         board[Coord(new_r, new_c)] = PlayerColor.RED
+        res.append(Coord(new_r, new_c))
+    return res
 
 
 def heuristic(board, goal):
@@ -80,14 +132,30 @@ def get_new_starting_points(shape,neighbor):
         ans.append(Coord(new_r,new_c))
     return ans
 
+def find_best_red(red_coords, goal):
+    best_row_coord = red_coords[0]
+    best_col_coord = red_coords[0]
+    r_dis = abs(best_row_coord.r - goal.r)
+    c_dis = abs(best_col_coord.c - goal.c) 
+    for red_coord in range (1, len(red_coords)):
+        new_r_dis = abs(red_coord.r - goal.r)
+        new_c_dis = abs(red_coord.c - goal.c)
+        if new_r_dis < r_dis:
+            best_row_coord = red_coord
+            r_dis = new_r_dis
+        if new_c_dis < c_dis:
+            best_col_coord = red_coord
+            c_dis = new_c_dis
+    return (best_row_coord, best_col_coord)
 
+UP = (-1, 0)
 def get_neighbors(coord, board):
     """
     Get the neighboring coordinates of a given coordinate,
     considering obstacles on the board.
     """
     neighbors = []
-    for dr, dc in [(1, 0), (-1, 0), (0, 1), (0, -1)]:
+    for dr, dc in [(1, 0), UP, (0, 1), (0, -1)]:
         new_r = (coord.r + dr)%11
         new_c = (coord.c + dc)%11
         # Check if the new coordinate is not obstructed by a blue block
@@ -109,25 +177,10 @@ def contains_goal_row_or_column(came_from, goal, board):
     else:
         return (2,False)
     
-def find_red_coordinates(board: dict[Coord, PlayerColor]) -> list:
+def findRedCoordinates(board: dict[Coord, PlayerColor]) -> list:
     red_blocks = [coord for coord, color in board.items() if color == PlayerColor.RED]
     return red_blocks
 
-def find_best_red(red_coords, goal):
-    best_row_coord = red_coords[0]
-    best_col_coord = red_coords[0]
-    r_dis = abs(best_row_coord.r - goal.r)
-    c_dis = abs(best_col_coord.c - goal.c) 
-    for red_coord in range (1, len(red_coords)):
-        new_r_dis = abs(red_coord.r - goal.r)
-        new_c_dis = abs(red_coord.c - goal.c)
-        if new_r_dis < r_dis:
-            best_row_coord = red_coord
-            r_dis = new_r_dis
-        if new_c_dis < c_dis:
-            best_col_coord = red_coord
-            c_dis = new_c_dis
-    return (best_row_coord, best_col_coord)
 
 def search(
     board: dict[Coord, PlayerColor], 
@@ -157,16 +210,17 @@ def search(
     # Do some impressive AI stuff here to find the solution...
     # ...
     # ... (your solution goes here!)
-    # for i in red_coords:
-    #     path = a_star_search(board, i, target)
-    #     if path == None:
-    #         continue
-    #     if shortest_path == None:
-    #         shortest_path = path
-    #     elif len(path) < len(shortest_path):
-    #         shortest_path = path
-    shortest_path = a_star_search(board,target)
-    print(render_board(shortest_path, target, ansi=True))
+    finalBoard = a_star_search(board,target)
+    #print(render_board(finalBoard.board, target, ansi=True))
+    
+    if not finalBoard:
+        return None
+    print(render_board(finalBoard.board, target, ansi=True))
+    path = retracePath(finalBoard,board)
+    ans = []
+    for i in path:
+        ans.append(PlaceAction(i[0],i[1],i[2],i[3]))
+    return ans
     # if shortest_path:
     #     print("Shortest path from start to goal:", shortest_path)
     # else:
