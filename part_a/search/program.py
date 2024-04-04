@@ -36,7 +36,7 @@ def a_star_search(board,goal):
                             cost = len(current.red_coordinates) + 4
                             heuristic_value = heuristic(newBoard,goal) # Calculate the heuristic value
                             f_score = cost + heuristic_value
-                            newRedCoord = findRedCoordinates(newBoard)
+                            newRedCoord = find_red_coordinates(newBoard)
                             newBoardState = BoardState(newBoard,newRedCoord)
                             if newBoardState not in visited:
                                 open_set.put((f_score, newBoardState))
