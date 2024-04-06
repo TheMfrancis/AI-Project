@@ -21,6 +21,9 @@ class BoardState:
     
 
 class Shape(Enum):
+    '''
+    An `Enum` class for all the different shape of tetrimino blocks
+    '''
     I1 = [(0,0), (1,0), (2,0), (3,0)]
     I2 = [(0,0), (0,1), (0,2), (0,3)]
 
