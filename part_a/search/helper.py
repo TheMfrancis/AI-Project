@@ -4,6 +4,9 @@ from .core import Coord, PlayerColor
 BLOCK_LEN = 4
 
 class Shape(Enum):
+    """
+    An `enum` class that contains all the possible tetrimino shapes used for the blocks
+    """
     I1 = [(0,0), (1,0), (2,0), (3,0)]
     I2 = [(0,0), (0,1), (0,2), (0,3)]
 
@@ -34,7 +37,6 @@ class BoardState:
     def __init__(self, board: dict[Coord, PlayerColor], parent = None, redInserted = None,cost = 0,redCoord = None,
                  bestR = 11, bestC = 11):
         self.board = board
-        #self.red_coordinates = red_coordinates
         self.parent = parent
         self.redInserted = redInserted
         self.cost = cost
