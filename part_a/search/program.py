@@ -141,7 +141,6 @@ def heuristic(boardState, goal):
     board = boardState.board
     row_spaces = sum([1 for r in range(BOARD_N) if board.get(Coord(r, goal.c)) == None])
     col_spaces = sum([1 for c in range(BOARD_N) if board.get(Coord(goal.r, c)) == None])
-    #return min(row_spaces,col_spaces)
     total_r = boardState.bestRow + col_spaces
     total_c = boardState.bestCol + row_spaces
     return min(total_r, total_c)
