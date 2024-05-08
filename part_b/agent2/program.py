@@ -171,18 +171,8 @@ class MCTSTreeNode:
 #     def select_best_action(self):
 #         best_child = max(self.root.children, key=lambda node: node.visits)
 #         return best_child.state.last_action
-
 class Agent:
-    """
-    This class is the "entry point" for your agent, providing an interface to
-    respond to various Tetress game events.
-    """
-
     def __init__(self, color: PlayerColor, **referee: dict):
-        """
-        This constructor method runs when the referee instantiates the agent.
-        Any setup and/or precomputation should be done here.
-        """
         self.turn = 1
         self._color = color
         self.numerical_color = None
@@ -208,45 +198,23 @@ class Agent:
             case PlayerColor.BLUE:
                 print("Testing: I am playing as BLUE")
 
+
     def action(self, **referee: dict) -> Action:
-        """
-        This method is called by the referee each time it is the agent's turn
-        to take an action. It must always return an action object. 
-        """
-
-        # Below we have hardcoded two actions to be played depending on whether
-        # the agent is playing as BLUE or RED. Obviously this won't work beyond
-        # the initial moves of the game, so you should use some game playing
-        # technique(s) to determine the best action to take.
-
-        if self.firstTurn:
-            self.firstTurn = False
-            match self._color:
-                case PlayerColor.RED:
-                    print("Testing: RED is playing a PLACE action")
-                    return PlaceAction(
-                        Coord(3, 3), 
-                        Coord(3, 4), 
-                        Coord(4, 3), 
-                        Coord(4, 4)
-                    )
-                case PlayerColor.BLUE:
-                    print("Testing: BLUE is playing a PLACE action")
-                    return PlaceAction(
-                        Coord(2, 3), 
-                        Coord(2, 4), 
-                        Coord(2, 5), 
-                        Coord(2, 6)
-                    )
-        root = MCTSTreeNode(state = BoardState(self.board,turn=self.numerical_color),player_turn=self.numerical_color)
-        selected_node = root.best_action()
-        action = selected_node.parent_action
-        coord1 = Coord(action[0].r,action[0].c)
-        coord2 = Coord(action[1].r,action[1].c)
-        coord3 = Coord(action[2].r,action[2].c)
-        coord4 = Coord(action[3].r,action[3].c)
-        return PlaceAction(coord1,coord2,coord3,coord4)
-
+        c1 = input("c1: ").split(",")
+        c2 = input("c2: ").split(",")
+        c3 = input("c3: ").split(",")
+        c4 = input("c4: ").split(",")
+        c1r = int(c1[0])
+        c1c = int(c1[1])
+        c2r = int(c2[0])
+        c2c = int(c2[1])
+        c3r = int(c3[0])
+        c3c = int(c3[1])
+        c4r = int(c4[0])
+        c4c = int(c4[1])
+        return PlaceAction(Coord(c1r,c1c),Coord(c2r,c2c),Coord(c3r,c3c),Coord(c4r,c4c))
+    
+    
     def update_board(self,coordinates):
         min_r = min(c.r for c in coordinates)
         max_r = max(c.r for c in coordinates)
@@ -332,3 +300,5 @@ class Agent:
         # demonstration purposes. You should replace this with your own logic
         # to update your agent's internal game state representation.
         print(f"Testing: {color} played PLACE action: {c1}, {c2}, {c3}, {c4}")
+
+
