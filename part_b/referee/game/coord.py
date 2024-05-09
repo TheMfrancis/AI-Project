@@ -122,3 +122,8 @@ class Coord(Vector2):
             (self.r - other.r) % BOARD_N, 
             (self.c - other.c) % BOARD_N
         )
+    def __eq__(self, other) -> bool:
+        return self.r == other.r and self.c == other.c
+
+    def __hash__(self) -> int:
+        return hash((self.r, self.c))

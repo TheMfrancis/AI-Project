@@ -1,15 +1,15 @@
 from enum import Enum
 from .core import PlayerColor, Coord, BOARD_N, PlaceAction  
 
-red_color = PlayerColor.RED
-blue_color = PlayerColor.BLUE
+DRAW = 2
 
 class BoardState:
-    def __init__(self, board: dict[Coord, int], parent = None, last_action = None, turn = None):
+    def __init__(self, board: dict[Coord, int], parent = None, last_action = None, color = None, opponent_color = None):
         self.board = board
         self.parent = parent
         self.last_action = last_action
-        self.turn = turn
+        self.color = color
+        self.opponent_color = opponent_color
 
  
     def can_place(self, coord, board, shape, placedAt):
@@ -40,7 +40,7 @@ class BoardState:
     def get_legal_actions(self):
         actions = []
         shapes = [shape.value for shape in Shape]
-        blocks = self.findCoordinates(self.board,self.turn)
+        blocks = self.findCoordinates(self.board,self.color)
         #print("blocks =",blocks)
         for block in blocks:
             neighbors = self.get_neighbors(block,self.board)
@@ -90,13 +90,11 @@ class BoardState:
         newBoard = self.board.copy()
         newTurn = None
         for coord in coordinates: 
-            assert(type(coord) != int) 
-            newBoard[coord] = self.turn
-        #print("selfturn ",self.turn)
-        if self.turn == 0:
-            newTurn = 1
+            newBoard[coord] = self.color
+        if self.color.value == PlayerColor.RED.value:
+            newTurn = PlayerColor.BLUE
         else:
-            newTurn = 0
+            newTurn = PlayerColor.RED
         newBoardState = BoardState(newBoard,self,coordinates,newTurn)
         newBoardState.update_board(coordinates)
         return newBoardState
@@ -122,7 +120,7 @@ class BoardState:
     def clone(self):
         newBoard = self.board.copy()
         newLastAction = None
-        return BoardState(newBoard,None,newLastAction,turn=self.turn)
+        return BoardState(newBoard,None,newLastAction,color=self.color)
     
     def is_terminal(self):
 
@@ -132,17 +130,22 @@ class BoardState:
         """
         Function to search the board and return a list of all red blocks found
         """
-        red_blocks = [coord for coord, color in board.items() if color == playerColor]
-        return red_blocks
+        blocks = [coord for coord, color in board.items() if color.value == playerColor.value]
+        return blocks
 
-    def is_winning(self, your_color):
-        opponent_blocks = self.findCoordinates(self.board,1 - your_color)
-        your_blocks = self.findCoordinates(self.board,your_color)
-        if len(your_blocks) > len(opponent_blocks):
-            return 1
-        elif len(your_blocks) < len(opponent_blocks):
-            return -1
-        return 0
+    def evaluate_state(self,player_color,opponent_color):
+        player_blocks = self.findCoordinates(self.board,player_color)
+        opponent_blocks = self.findCoordinates(self.board,opponent_color)
+        return len(player_blocks) - len(opponent_blocks)
+
+    def get_winning_color(self):
+        red = self.findCoordinates(self.board,PlayerColor.RED)
+        blue = self.findCoordinates(self.board,PlayerColor.BLUE)
+        if len(red) > len(blue):
+            return PlayerColor.RED
+        elif len(blue) > len(red):
+            return PlayerColor.BLUE
+        return DRAW
 
 class Shape(Enum):
     '''

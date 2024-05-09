@@ -200,20 +200,33 @@ class Agent:
 
 
     def action(self, **referee: dict) -> Action:
-        c1 = input("c1: ").split(",")
-        c2 = input("c2: ").split(",")
-        c3 = input("c3: ").split(",")
-        c4 = input("c4: ").split(",")
-        c1r = int(c1[0])
-        c1c = int(c1[1])
-        c2r = int(c2[0])
-        c2c = int(c2[1])
-        c3r = int(c3[0])
-        c3c = int(c3[1])
-        c4r = int(c4[0])
-        c4c = int(c4[1])
-        return PlaceAction(Coord(c1r,c1c),Coord(c2r,c2c),Coord(c3r,c3c),Coord(c4r,c4c))
-    
+        if self.firstTurn:
+            self.firstTurn = False
+            match self._color:
+                case PlayerColor.RED:
+                    print("Testing: RED is playing a PLACE action")
+                    return PlaceAction(
+                        Coord(3, 3), 
+                        Coord(3, 4), 
+                        Coord(4, 3), 
+                        Coord(4, 4)
+                    )
+                case PlayerColor.BLUE:
+                    print("Testing: BLUE is playing a PLACE action")
+                    return PlaceAction(
+                        Coord(2, 3), 
+                        Coord(2, 4), 
+                        Coord(2, 5), 
+                        Coord(2, 6)
+                    )
+        boardstate = BoardState(self.board,turn=self.numerical_color)
+        possiblemoves = boardstate.get_legal_actions()
+        action = random.choice(possiblemoves)
+        coord1 = Coord(action[0].r,action[0].c)
+        coord2 = Coord(action[1].r,action[1].c)
+        coord3 = Coord(action[2].r,action[2].c)
+        coord4 = Coord(action[3].r,action[3].c)
+        return PlaceAction(coord1,coord2,coord3,coord4)
     
     def update_board(self,coordinates):
         min_r = min(c.r for c in coordinates)

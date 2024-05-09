@@ -12,38 +12,36 @@ from referee.game.coord import Coord
 from .helper import BoardState
 
 class MCTSTreeNode:
-    def __init__(self, state, parent=None, parent_action=None, player_turn = None, opponent = None):
+    def __init__(self, state, parent=None, parent_action=None, color = None, opponent_color = None,):
         self.state = state
         self.parent = parent
         self.parent_action = parent_action
         self.children = []
         self.visits = 0
-        self._results = defaultdict(int)
-        self._results[1] = 0
-        self._results[-1] = 0
-        self._player_turn = player_turn
-        self._opponent = opponent
-        self._untried_actions = self.untried_actions()
-        self.legal_actions = self._untried_actions.copy()
+        self.wins = 0
+        self.color = color
+        self.opponent_color = opponent_color
+        self.untried_actions = self.get_untried_actions()
+        self.legal_actions = self.untried_actions.copy()
 
-    def untried_actions(self):
+    def get_untried_actions(self):
         self._untried_actions = self.state.get_legal_actions()
         return self._untried_actions
     
-    def q(self):
-        wins = self._results[1]
-        loses = self._results[-1]
-        return wins - loses
-    def n(self):
-        return self.visits
+    # def q(self):
+    #     wins = self._results[1]
+    #     loses = self._results[-1]
+    #     return wins - loses
+    # def n(self):
+    #     return self.visits
     
     def expand(self):
-        action = self._untried_actions.pop()
+        action = self.untried_actions.pop(random.randrange(len(self.untried_actions)))
         #print("before = ",self.state.board)
         next_state = self.state.perform_action(action)
         #print("after = ",next_state.board)
         #print("newturn ",next_state.turn)
-        child_node = MCTSTreeNode(next_state, parent=self, parent_action=action,player_turn=next_state.turn)
+        child_node = MCTSTreeNode(next_state, parent=self, parent_action=action,color=self.opponent_color,opponent_color=self.color)
         #print("hereeeeee",child_node.state.turn)
         self.children.append(child_node)
         return child_node 
@@ -56,19 +54,25 @@ class MCTSTreeNode:
         current_rollout_state = self.state.clone()
         #print(current_rollout_state.board)
         #print(current_rollout_state.board)
+        depth_limit = None
+        if self.color == PlayerColor.RED:
+            depth_limit = 3
+        else:
+            depth_limit = 4
         depth = 0
-        while depth < 5: #not current_rollout_state.is_game_over() and:
+        while depth < depth_limit: #not current_rollout_state.is_game_over() and:
             depth += 1
             possible_moves = current_rollout_state.get_legal_actions()
             if len(possible_moves) == 0:
-                return -1
+                return current_rollout_state.opponent_color
             #print(current_rollout_state.board)
             action = self.rollout_policy(possible_moves)
             #print("action ",action)
             current_rollout_state = current_rollout_state.perform_action(action)
         #print("player_turn ",self._player_turn)
         #print("opponent ", self._opponent)
-        return current_rollout_state.is_winning(1-self._player_turn)
+        winning_color = current_rollout_state.get_winning_color()
+        return winning_color
     
 #     def simulate_from_node(self, node, depth):
 #         current_state = node.state.clone()
@@ -90,87 +94,77 @@ class MCTSTreeNode:
     
     def backpropagate(self, result):
         self.visits += 1.
-        self._results[result] += 1.
+        if self.color == result:
+            self.wins += 1
         if self.parent:
             self.parent.backpropagate(result)
 
-    def is_terminal_node(self):
-        return self.state.is_game_over()
+    # def is_terminal_node(self):
+    #     return self.state.is_game_over()
     
     def is_fully_expanded(self):
         return len(self._untried_actions) == 0
 
     def best_child(self, c_param=0.1):   
-        choices_weights = [(c.q() / c.n()) + c_param * np.sqrt((2 * np.log(self.n()) / c.n())) for c in self.children]
+        choices_weights = [(c.wins / c.visits) + c_param * np.sqrt((np.log(self.visits) / c.visits)) for c in self.children]
         return self.children[np.argmax(choices_weights)]
     
     def best_action(self):
-        simulation_no = 80
-        for i in range(simulation_no): 
+        simulation_no = 50
+        for _ in range(simulation_no): 
             v = self._tree_policy()
             reward = v.rollout()
             v.backpropagate(reward)
-        return self.best_child()
-
-    # def is_fully_expanded(self):
-    #     return len(self.children) == len(self.state.get_legal_actions())
-
-    # def select_child(self, exploration_factor=1.0):
-    #     exploration_bonus = exploration_factor * math.sqrt(math.log(self.visits + 1) / (self.visits + 1e-6))
-    #     best_child = max(self.children, key=lambda node: node.wins / (node.visits + 1e-6) + exploration_bonus)
-    #     return best_child
-
-    # def expand(self):
-    #     legal_actions = self.state.get_legal_actions()
-    #     action = random.choice(legal_actions)
-    #     next_state = self.state.perform_action(action)
-    #     new_node = MCTSTreeNode(next_state, parent=self)
-    #     self.children.append(new_node)
-    #     return new_node
-
-    # def backpropagate(self, result):
-    #     self.visits += 1
-    #     self.wins += result
-    #     if self.parent:
-    #         self.parent.backpropagate(result)
+        best_index = 0
+        best_visits = self.children[0].visits
+        for i in range(len(self.children)):
+            if self.children[i].visits > best_visits:
+                best_visits = self.children[i].visits
+                best_index = i
+        return self.children[best_index]
 
 
-# class MonteCarloTreeSearchAgent:
-#     def __init__(self,exploration_factor,simulation_limit,cutoff_depth):
-#         self.root = None
-#         self.exploration_factor = exploration_factor
-#         self.simulation_limit = simulation_limit
-#         self.cutoff_depth = cutoff_depth  # Example cutoff depth
+def minimax_alpha_beta(state, depth, alpha, beta, maximizing_player):
+    legal_actions = state.get_legal_actions()
+    if depth == 0 or len(legal_actions) == 0:
+        return state.evaluate_state(PlayerColor.RED,PlayerColor.BLUE)
 
-#     def action(self, initial_state, **referee: dict) -> PlaceAction:
-#         if self.root is None:
-#             self.root = MCTSTreeNode(initial_state)
+    if maximizing_player:
+        max_eval = -math.inf
+        for action in legal_actions:
+            next_state = state.perform_action(action)
+            eval = minimax_alpha_beta(next_state, depth - 1, alpha, beta, False)
+            max_eval = max(max_eval, eval)
+            alpha = max(alpha, eval)
+            if beta <= alpha:
+                break
+        return max_eval
+    else:
+        min_eval = math.inf
+        for action in legal_actions:
+            next_state = state.perform_action(action)
+            eval = minimax_alpha_beta(next_state, depth - 1, alpha, beta, True)
+            min_eval = min(min_eval, eval)
+            beta = min(beta, eval)
+            if beta <= alpha:
+                break
+        return min_eval
 
-#         for _ in range(self.simulation_limit):
-#             node = self.select_node_to_expand()
-#             result = self.simulate_from_node(node, depth=0)  # Pass depth=0 for initial depth
-#             node.backpropagate(result)
-
-#         best_action = self.select_best_action()
-#         return best_action
-
-#     def select_node_to_expand(self):
-#         current_node = self.root
-#         while not current_node.state.is_terminal() and current_node.is_fully_expanded():
-#             current_node = current_node.select_child(self.exploration_factor)
-#         return current_node
-
-#     def simulate_from_node(self, node, depth):
-#         current_state = node.state.clone()
-#         while not current_state.is_terminal() and depth < self.cutoff_depth:
-#             action = random.choice(current_state.get_legal_actions())
-#             current_state = current_state.perform_action(action)
-#             depth += 1
-#         return current_state.is_winning()
-
-#     def select_best_action(self):
-#         best_child = max(self.root.children, key=lambda node: node.visits)
-#         return best_child.state.last_action
+def minimax_alpha_beta_decision(state, depth):
+    best_action = None
+    best_value = -math.inf
+    alpha = -math.inf
+    beta = math.inf
+    legal_actions = state.get_legal_actions()
+    print(len(legal_actions))
+    for action in legal_actions:
+        next_state = state.perform_action(action)
+        value = minimax_alpha_beta(next_state, depth - 1, alpha, beta, False)
+        if value > best_value:
+            best_value = value
+            best_action = action
+        alpha = max(alpha, value)
+    return best_action
 
 class Agent:
     """
@@ -184,23 +178,26 @@ class Agent:
         Any setup and/or precomputation should be done here.
         """
         self.turn = 1
-        self._color = color
+        self.color = color
+        self.opponent_color = None
+        if color == PlayerColor.RED.value:
+            self.opponent_color = PlayerColor.BLUE
+        else:
+            self.opponent_color = PlayerColor.RED
         self.numerical_color = None
-        if(self._color == PlayerColor.RED):
+        if(self.color == PlayerColor.RED.value):
             self.numerical_color = 0
         else:
             self.numerical_color = 1
-        self.exploration_factor = 1
-        self.simulation_limit = 100
-        self.cutoff_depth = 2
-        self.board = {Coord(3, 3): 0, 
-                    Coord(3, 4): 0, 
-                    Coord(4, 3): 0,
-                    Coord(4, 4): 0,
-                    Coord(2, 3): 1,
-                    Coord(2, 4): 1,
-                    Coord(2, 5): 1, 
-                    Coord(2, 6): 1}
+        self.board = {}
+        # self.board = {Coord(3, 3): 0, 
+        #             Coord(3, 4): 0, 
+        #             Coord(4, 3): 0,
+        #             Coord(4, 4): 0,
+        #             Coord(2, 3): 1,
+        #             Coord(2, 4): 1,
+        #             Coord(2, 5): 1, 
+        #             Coord(2, 6): 1}
         self.firstTurn = True
         match color:
             case PlayerColor.RED:
@@ -218,10 +215,11 @@ class Agent:
         # the agent is playing as BLUE or RED. Obviously this won't work beyond
         # the initial moves of the game, so you should use some game playing
         # technique(s) to determine the best action to take.
-
+        print(self.turn)
+        self.turn += 2
         if self.firstTurn:
             self.firstTurn = False
-            match self._color:
+            match self.color:
                 case PlayerColor.RED:
                     print("Testing: RED is playing a PLACE action")
                     return PlaceAction(
@@ -238,9 +236,14 @@ class Agent:
                         Coord(2, 5), 
                         Coord(2, 6)
                     )
-        root = MCTSTreeNode(state = BoardState(self.board,turn=self.numerical_color),player_turn=self.numerical_color)
-        selected_node = root.best_action()
-        action = selected_node.parent_action
+        initialBoardState = BoardState(self.board,color=self.color,opponent_color=self.opponent_color)
+        action = None
+        if self.turn>30:
+            action = minimax_alpha_beta_decision(initialBoardState,2)
+        else:
+            root = MCTSTreeNode(state = initialBoardState, color=self.color, opponent_color=self.opponent_color)
+            selected_node = root.best_action()
+            action = selected_node.parent_action
         coord1 = Coord(action[0].r,action[0].c)
         coord2 = Coord(action[1].r,action[1].c)
         coord3 = Coord(action[2].r,action[2].c)
@@ -285,21 +288,20 @@ class Agent:
         """
 
         # There is only one action type, PlaceAction
-        self.turn += 1
         place_action: PlaceAction = action
         c1, c2, c3, c4 = place_action.coords
-        numeric_color = None
-        if color == PlayerColor.RED:
-            numeric_color = 0
-        else:
-            numeric_color = 1
+        # numeric_color = None
+        # if color == PlayerColor.RED:
+        #     numeric_color = 0
+        # else:
+        #     numeric_color = 1
         coordinates = [c1,c2,c3,c4]
         # min_r = min(c.r for c in coordinates)
         # max_r = max(c.r for c in coordinates)
         # min_c = min(c.c for c in coordinates)
         # max_c = max(c.c for c in coordinates)
         for coord in coordinates:
-            self.board[coord] = numeric_color
+            self.board[coord] = color
         self.update_board(coordinates)
         # for r in range(min_r, max_r + 1):
         #     non_empty_coords = []

@@ -44,6 +44,7 @@ class PlayerColor(Enum):
                 return PlayerColor.BLUE
             case PlayerColor.BLUE:
                 return PlayerColor.RED
+            
 
 
 
