@@ -1,10 +1,15 @@
 from enum import Enum
-from .core import PlayerColor, Coord, BOARD_N, PlaceAction  
+from .core import BOARD_N 
+import numpy as np
 
-DRAW = 2
+
+RED = 1
+BLUE = 2
+DRAW = 3
+FILLED_THRESHOLD = 5
 
 class BoardState:
-    def __init__(self, board: dict[Coord, int], parent = None, last_action = None, color = None, opponent_color = None):
+    def __init__(self, board, parent = None, last_action = None, color = None, opponent_color = None):
         self.board = board
         self.parent = parent
         self.last_action = last_action
@@ -12,15 +17,15 @@ class BoardState:
         self.opponent_color = opponent_color
 
  
-    def can_place(self, coord, board, shape, placedAt):
+    def can_place(self, coord, shape, placedAt):
         """
         Boolean function to determine if the shape can be fit into the given coordinate based on surrounding pieces
         """
         for r, c in shape:
-            new_r = (coord.r + r)%BOARD_N
-            new_c = (coord.c + c)%BOARD_N
-            placedAt.append(Coord(new_r,new_c))
-            if Coord(new_r,new_c) in board.keys():
+            new_r = (coord[0] + r)%BOARD_N
+            new_c = (coord[1] + c)%BOARD_N
+            placedAt.append((new_r,new_c))
+            if self.board[new_r,new_c] != 0:
                 return False
         return True
     
@@ -32,74 +37,54 @@ class BoardState:
             newStart = tuple(x - y for x, y in zip(shape[0], diff))
             res.append(newStart)
         for i in res:
-            new_r = (neighbor.r + i[0])%BOARD_N
-            new_c = (neighbor.c + i[1])%BOARD_N
-            ans.append(Coord(new_r,new_c))
+            new_r = (neighbor[0] + i[0])%BOARD_N
+            new_c = (neighbor[1] + i[1])%BOARD_N
+            ans.append((new_r,new_c))
         return ans
 
-    def get_legal_actions(self):
+    def get_legal_actions(self,color):
         actions = []
         shapes = [shape.value for shape in Shape]
-        blocks = self.findCoordinates(self.board,self.color)
-        #print("blocks =",blocks)
+        blocks = self.findCoordinates(color)
         for block in blocks:
-            neighbors = self.get_neighbors(block,self.board)
-            #print(neighbors)
+            neighbors = self.get_neighbors(block)
             for neighbor in neighbors:
                 for shape in shapes:
                     possible_start_points = self.get_new_starting_points(shape,neighbor)
                     for start in possible_start_points:
                         placedAt = []
-                        if self.can_place(start,self.board,shape,placedAt): 
-                            actions.append(placedAt)  
-        # if len(actions) == 0:
-        #     print(self.board)
-        return actions
+                        if self.can_place(start,shape,placedAt):
+                            actions.append(tuple(placedAt)) 
+        unique_actions = list(set(actions))
+        return unique_actions
     
-    def update_board(self,coordinates):
-        min_r = min(c.r for c in coordinates)
-        max_r = max(c.r for c in coordinates)
-        min_c = min(c.c for c in coordinates)
-        max_c = max(c.c for c in coordinates)
-        coords_to_remove = set()
-        for r in range(min_r, max_r + 1):
-            non_empty_coords = []
-            for c in range(BOARD_N):
-                if self.board.get(Coord(r,c)) != None:
-                    non_empty_coords.append(Coord(r,c))
-                else:
-                    break
-            if len(non_empty_coords) == BOARD_N:
-                for coord in non_empty_coords:
-                    coords_to_remove.add(coord)
-
-        for c in range(min_c, max_c + 1):
-            non_empty_coords = []
-            for r in range(BOARD_N):
-                if self.board.get(Coord(r,c)) != None:
-                    non_empty_coords.append(Coord(r,c))
-                else:
-                    break
-            if len(non_empty_coords) == BOARD_N:
-                for coord in non_empty_coords:
-                    coords_to_remove.add(coord)
-        for coord in coords_to_remove:
-            self.board.pop(coord)
+    def update_board(self):
+        # Create a boolean mask for non-zero entries
+        non_zero_mask = self.board != 0
+        # Sum along the rows and columns
+        row_non_zero_sums = np.sum(non_zero_mask, axis=1)
+        col_non_zero_sums = np.sum(non_zero_mask, axis=0)
+        # Find indices where the sum of non-zero entries equals 11
+        row_indices = np.where(row_non_zero_sums == 11)[0]
+        col_indices = np.where(col_non_zero_sums == 11)[0]
+        # Set rows and columns to 0
+        self.board[row_indices, :] = 0
+        self.board[:, col_indices] = 0
 
     def perform_action(self,coordinates):
         newBoard = self.board.copy()
         newTurn = None
         for coord in coordinates: 
             newBoard[coord] = self.color
-        if self.color.value == PlayerColor.RED.value:
-            newTurn = PlayerColor.BLUE
+        if self.color == RED:
+            newTurn = BLUE
         else:
-            newTurn = PlayerColor.RED
+            newTurn = RED
         newBoardState = BoardState(newBoard,self,coordinates,newTurn)
-        newBoardState.update_board(coordinates)
+        newBoardState.update_board()
         return newBoardState
 
-    def get_neighbors(self, coord, board):
+    def get_neighbors(self, coord):
         """
         Get the neighboring coordinates of a given coordinate,
         considering obstacles on the board.
@@ -110,42 +95,46 @@ class BoardState:
         LEFT = (0,-1)
         neighbors = []
         for dr, dc in [DOWN, UP, RIGHT, LEFT]:
-            new_r = (coord.r + dr)%BOARD_N
-            new_c = (coord.c + dc)%BOARD_N
+            new_r = (coord[0] + dr)%BOARD_N
+            new_c = (coord[1] + dc)%BOARD_N
             # Check if the new coordinate is not obstructed by a blue block
-            if board.get(Coord(new_r, new_c)) != 1 and board.get(Coord(new_r, new_c)) != 0:
-                neighbors.append(Coord(new_r, new_c))  # Add the neighboring coordinate
+            if self.board[new_r,new_c] != RED and self.board[new_r,new_c] != BLUE:
+                neighbors.append((new_r, new_c))  # Add the neighboring coordinate
         return neighbors
     
     def clone(self):
         newBoard = self.board.copy()
-        newLastAction = None
-        return BoardState(newBoard,None,newLastAction,color=self.color)
+        return BoardState(newBoard,None,None,color=self.color,
+                          opponent_color=self.opponent_color)
     
-    def is_terminal(self):
+    def count_rows_or_columns_with_blocks(self, color, threshold):
+        # Count rows with more than `threshold` blocks of the specified color
+        row_counts = np.sum(self.board == color, axis=1)
+        filled_row = np.sum(row_counts > threshold)
+        # Count columns with more than `threshold` blocks of the specified color
+        column_counts = np.sum(self.board == color, axis=0)
+        filled_col = np.sum(column_counts > threshold)
+        return filled_row + filled_col
 
-        return 
-
-    def findCoordinates(self, board: dict[Coord, int],playerColor) -> list:
+    def findCoordinates(self, playerColor) -> list:
         """
         Function to search the board and return a list of all red blocks found
         """
-        blocks = [coord for coord, color in board.items() if color.value == playerColor.value]
-        return blocks
+        indices = np.where(self.board == playerColor)
+        coordinates = list(zip(indices[0], indices[1]))
+        return coordinates
 
     def evaluate_state(self,player_color,opponent_color):
-        player_blocks = self.findCoordinates(self.board,player_color)
-        opponent_blocks = self.findCoordinates(self.board,opponent_color)
-        return len(player_blocks) - len(opponent_blocks)
+        player = self.findCoordinates(player_color)
+        opponent = self.findCoordinates(opponent_color)
+        block_diff = len(player) - len(opponent)
+        red_col = self.count_rows_or_columns_with_blocks(RED,FILLED_THRESHOLD)
+        blue_col = self.count_rows_or_columns_with_blocks(BLUE,FILLED_THRESHOLD)
+        return block_diff + blue_col - red_col
 
-    def get_winning_color(self):
-        red = self.findCoordinates(self.board,PlayerColor.RED)
-        blue = self.findCoordinates(self.board,PlayerColor.BLUE)
-        if len(red) > len(blue):
-            return PlayerColor.RED
-        elif len(blue) > len(red):
-            return PlayerColor.BLUE
-        return DRAW
+
+    
+
 
 class Shape(Enum):
     '''
